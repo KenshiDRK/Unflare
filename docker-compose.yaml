@@ -1,0 +1,5 @@
+services:
+  unflare:
+    image: ghcr.io/iamyegor/unflare
+    ports:
+      - "5002:5002"
