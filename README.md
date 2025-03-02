@@ -95,14 +95,14 @@ Returns cookies and headers that can be used for future requests to the target s
 
 ```bash
 # Basic GET request
-curl -X POST http://your-api-url/scrape \
+curl -X POST http://localhost:5002/scrape \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com", "timeout": 60000, "method": "GET"}'
 ```
 
 ```bash
 # POST request with form data
-curl -X POST http://your-api-url/scrape \
+curl -X POST http://localhost:5002/scrape \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://example.com/login", 
@@ -117,7 +117,7 @@ curl -X POST http://your-api-url/scrape \
 
 ```bash
 # Using proxy
-curl -X POST http://your-api-url/scrape \
+curl -X POST http://localhost:5002/scrape \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://example.com", 
@@ -134,7 +134,7 @@ curl -X POST http://your-api-url/scrape \
 ## Using in JavaScript
 
 ```javascript
-const response = await fetch('http://your-api-url/scrape', {
+const response = await fetch('http://localhost:5002/scrape', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json'
