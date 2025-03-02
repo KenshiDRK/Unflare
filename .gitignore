@@ -11,11 +11,6 @@ build/
 .next/
 out/
 
-# Environment variables
-.env
-.env.*
-!.env.example
-
 # TypeScript cache
 *.tsbuildinfo
 .tsc-cache/
