@@ -1,6 +1,8 @@
 ## **Unflare**
 A Node.js API service that bypasses Cloudflare protection. It uses `puppeteer-real-browser` to automatically solve challenges and returns the necessary cookies and headers for you to make subsequent requests directly to the target website.
 
+**The preferred way to run it is by** using Docker (scroll to the bottom of the Readme)
+
 ### **Key Features**
 - Handles **GET** and **POST (form data)** requests
 - Supports **proxy configuration** (Host/Port/Auth)
@@ -29,15 +31,35 @@ Send a `POST` request to `/scrape` with a JSON body:
 {
   "url": "https://example.com",
   "timeout": 60000,
-  "method": "GET"
+  "method": "GET",
+  "proxy": {
+    "host": "proxy.example.com",
+    "port": 8080,
+    "username": "user",
+    "password": "pass"
+  }
 }
 ```
 
 ### **Successful Response**
 ```json
 {
-  "cookies": [ ... ],
-  "headers": { ... }
+  "cookies": [
+    {
+      "name": "cf_clearance",
+      "value": "abc123...",
+      "domain": ".example.com",
+      "path": "/",
+      "expires": 1676142392.307484,
+      "httpOnly": true,
+      "secure": true
+    },
+    // more cookies
+  ],
+  "headers": {
+    "user-agent": "Mozilla/5.0...",
+    // more headers
+  }
 }
 ```
 
@@ -69,7 +91,13 @@ const res = await fetch('http://localhost:5002/scrape', {
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     url: 'https://example.com',
-    timeout: 60000
+    timeout: 60000,
+    proxy: {
+      host: "proxy.example.com",
+      port: 8080,
+      username: "user",
+      password: "pass"
+    }
   })
 });
 
