@@ -1,5 +1,7 @@
 ## **Unflare**
-A Node.js API service that bypasses Cloudflare protection. It uses `puppeteer-real-browser` to automatically solve challenges and returns the necessary cookies and headers for you to make subsequent requests directly to the target website.
+A Node.js API service that bypasses Cloudflare protection. It uses `puppeteer-real-browser` to automatically solve challenges and returns the necessary cookies and headers for you to make subsequent requests directly to the target website.  
+
+The main idea behind Unflare is that it handles the Cloudflare protection page — the one you see when visiting a site protected by Cloudflare — and returns a valid `cf_clearance` token. This token proves the challenge was solved and allows your own scripts or browser to access the page without going through the challenge again.
 
 **The preferred way to run it is by** using Docker (scroll to the bottom of the Readme)
 
