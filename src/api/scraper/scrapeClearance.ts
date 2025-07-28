@@ -49,7 +49,21 @@ export async function scrapeClearance(req: Request, res: Response) {
 
         const connectOptions: any = {
             headless: false,
-            args: [],
+            args: [
+                "--disable-dev-shm-usage",           // Evita uso intensivo de /dev/shm
+                "--disable-gpu",                     // Desactiva GPU (no necesaria en server)
+                "--disable-setuid-sandbox",          // Menos aislamiento, menos memoria
+                "--no-sandbox",                      // Desactiva sandboxing
+                "--no-zygote",                       // Desactiva procesos intermedios
+                "--disable-software-rasterizer",     // Evita carga de renderizado extra
+                "--disable-accelerated-2d-canvas",   // Menos carga en el renderizado
+                "--disable-dev-tools",               // DevTools innecesarios
+                "--no-first-run",                    // Evita configuraciones iniciales
+                "--mute-audio",                      // Silencia todo, menos carga
+                "--window-size=640,480",             // Tamaño fijo (menos recursos)
+                //"--single-process",                  // No forks (hace Fallar)
+                "--js-flags=--no-expose-wasm,--jitless", // Desactiva JIT y WebAssembly
+            ],
             customConfig: {},
             turnstile: true,
             connectOption: {},
@@ -67,7 +81,7 @@ export async function scrapeClearance(req: Request, res: Response) {
 
         page.setDefaultTimeout(data.timeout ?? 60_000);
 
-        await page.setViewport({ width: 800, height: 600 });
+        await page.setViewport({ width: 640, height: 480});
 
         if (data.method === "GET") {
             await page.goto(data.url, { waitUntil: "networkidle2" });
@@ -206,45 +220,5 @@ async function getClearance(
                 reject("Timeout Error");
             }
         }, data.timeout || 60000);
-    });
-}
-
-export async function fetchWithPython(url: string, headers: any, cookies: any): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const pythonScriptPath = path.resolve(__dirname, "../scripts/scraper.py");
-        const python = spawn("python3", [pythonScriptPath]);
-
-        const payload = JSON.stringify({ url, headers, cookies });
-
-        let stdout = "";
-        let stderr = "";
-
-        python.stdout.on("data", (data) => {
-            stdout += data.toString();
-        });
-
-        python.stderr.on("data", (data) => {
-            stderr += data.toString();
-        });
-
-        python.on("close", (code) => {
-            if (code !== 0) {
-                return reject(`Python error: ${stderr}`);
-            }
-
-            try {
-                const parsed = JSON.parse(stdout);
-                if (parsed.status === "success") {
-                    resolve(parsed.html);
-                } else {
-                    reject(`Scraper error: ${parsed.error}`);
-                }
-            } catch (err) {
-                reject(`Failed to parse Python output: ${err}`);
-            }
-        });
-
-        python.stdin.write(payload);
-        python.stdin.end();
     });
 }
