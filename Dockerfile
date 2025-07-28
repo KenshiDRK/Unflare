@@ -1,4 +1,4 @@
-FROM node:22.14.0-slim
+FROM node:24.4.1-slim
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \

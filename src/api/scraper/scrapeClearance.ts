@@ -60,11 +60,12 @@ export async function scrapeClearance(req: TypedRequest, res: Response) {
         }
 
         const connection = await connect(connectOptions);
-
         browser = connection.browser;
         page = connection.page;
 
         page.setDefaultTimeout(data.timeout ?? 60_000);
+
+        await page.setViewport({ width: 800, height: 600 });
 
         if (data.method === "GET") {
             await page.goto(data.url, { waitUntil: "networkidle2" });
@@ -75,13 +76,8 @@ export async function scrapeClearance(req: TypedRequest, res: Response) {
         browserLogger.info(`Navigated to ${data.url} using ${data.method} method`);
 
         if (await isBlocked(page)) {
-            browserLogger.info(
-                "You were blocked by Cloudflare, this is likely because your IP address is blacklisted or your proxy is unreliable"
-            );
-            return handleFailureResponse(
-                ErrorResponse.create("error", "Blocked by Cloudflare"),
-                res
-            );
+            browserLogger.info("You were blocked by Cloudflare, this is likely because your IP address is blacklisted or your proxy is unreliable");
+            return handleFailureResponse(ErrorResponse.create("error", "Blocked by Cloudflare"), res);
         }
 
         const session = await getClearance(page, browser, data, browserLogger);
@@ -98,6 +94,7 @@ export async function scrapeClearance(req: TypedRequest, res: Response) {
         } else {
             errorData.msg = String(error);
         }
+
         browserLogger.error(errorData);
 
         if (error instanceof z.ZodError) {
