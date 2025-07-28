@@ -84,7 +84,16 @@ export async function scrapeClearance(req: TypedRequest, res: Response) {
 
         browserLogger.info("Successfully obtained clearance");
 
-        return handleSuccessResponse(session, res);
+        const html = await page.content();
+
+        browserLogger.info("Successfully scraped HTML content");
+
+        return res.status(200).json({
+            status: "success",
+            html,
+            headers: session.headers,
+            cookies: session.cookies,
+        });
     } catch (error) {
         const errorData: Record<string, unknown> = {};
 
