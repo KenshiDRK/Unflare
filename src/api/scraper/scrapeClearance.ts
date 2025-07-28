@@ -11,6 +11,8 @@ import type pino from "pino";
 import { connect, type PageWithCursor } from "puppeteer-real-browser";
 import type { Browser } from "rebrowser-puppeteer-core";
 import { z } from "zod";
+import { spawn } from "child_process";
+import path from "path";
 
 const ProxySchema = z.object({
     host: z.string(),
@@ -35,8 +37,8 @@ interface TypedRequest extends Request {
     body: z.infer<typeof ScrapeClearanceRequestSchema>;
 }
 
-export async function scrapeClearance(req: TypedRequest, res: Response) {
-    let browserLogger = logger.child({ endpoint: "scrapeClearance" });
+export async function scrapeClearance(req: Request, res: Response) {
+    const browserLogger = logger.child({ endpoint: "scrapeClearance" });
     let browser;
     let page;
 
@@ -76,7 +78,7 @@ export async function scrapeClearance(req: TypedRequest, res: Response) {
         browserLogger.info(`Navigated to ${data.url} using ${data.method} method`);
 
         if (await isBlocked(page)) {
-            browserLogger.info("You were blocked by Cloudflare, this is likely because your IP address is blacklisted or your proxy is unreliable");
+            browserLogger.info("Blocked by Cloudflare");
             return handleFailureResponse(ErrorResponse.create("error", "Blocked by Cloudflare"), res);
         }
 
@@ -84,16 +86,59 @@ export async function scrapeClearance(req: TypedRequest, res: Response) {
 
         browserLogger.info("Successfully obtained clearance");
 
-        const html = await page.content();
+        // Aquí haces el request con Python
+        const pythonScriptPath = path.resolve(__dirname, "../scripts/scraper.py");
+        const html = await new Promise<string>((resolve, reject) => {
+            const python = spawn("python3", [pythonScriptPath]);
 
-        browserLogger.info("Successfully scraped HTML content");
+            const inputPayload = JSON.stringify({
+                url: data.url,
+                headers: session.headers,
+                cookies: session.cookies,
+            });
 
-        return res.status(200).json({
+            let output = "";
+            let errorOutput = "";
+
+            python.stdin.write(inputPayload);
+            python.stdin.end();
+
+            python.stdout.on("data", (data) => {
+                output += data.toString();
+            });
+
+            python.stderr.on("data", (data) => {
+                errorOutput += data.toString();
+            });
+
+            python.on("close", (code) => {
+                if (code !== 0) {
+                    browserLogger.error({
+                        msg: "Python scraper failed",
+                        code,
+                        error: errorOutput,
+                    });
+                    return reject(new Error(errorOutput || "Python scraper failed"));
+                }
+
+                try {
+                    const result = JSON.parse(output);
+                    resolve(result.html || "");
+                } catch (err) {
+                    browserLogger.error({
+                        msg: "Invalid JSON from Python",
+                        rawOutput: output,
+                    });
+                    reject(new Error("Invalid JSON output from scraper"));
+                }
+            });
+        });
+
+        return res.json({
             status: "success",
             html,
-            headers: session.headers,
-            cookies: session.cookies,
         });
+
     } catch (error) {
         const errorData: Record<string, unknown> = {};
 
@@ -161,5 +206,45 @@ async function getClearance(
                 reject("Timeout Error");
             }
         }, data.timeout || 60000);
+    });
+}
+
+export async function fetchWithPython(url: string, headers: any, cookies: any): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const pythonScriptPath = path.resolve(__dirname, "../scripts/scraper.py");
+        const python = spawn("python3", [pythonScriptPath]);
+
+        const payload = JSON.stringify({ url, headers, cookies });
+
+        let stdout = "";
+        let stderr = "";
+
+        python.stdout.on("data", (data) => {
+            stdout += data.toString();
+        });
+
+        python.stderr.on("data", (data) => {
+            stderr += data.toString();
+        });
+
+        python.on("close", (code) => {
+            if (code !== 0) {
+                return reject(`Python error: ${stderr}`);
+            }
+
+            try {
+                const parsed = JSON.parse(stdout);
+                if (parsed.status === "success") {
+                    resolve(parsed.html);
+                } else {
+                    reject(`Scraper error: ${parsed.error}`);
+                }
+            } catch (err) {
+                reject(`Failed to parse Python output: ${err}`);
+            }
+        });
+
+        python.stdin.write(payload);
+        python.stdin.end();
     });
 }
