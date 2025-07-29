@@ -60,7 +60,28 @@ export async function scrapeClearance(req: Request, res: Response) {
                 "--disable-dev-tools",               // DevTools innecesarios
                 "--no-first-run",                    // Evita configuraciones iniciales
                 "--mute-audio",                      // Silencia todo, menos carga
-                "--window-size=500,300",             // Tamaño fijo (menos recursos)
+                "--window-size=300,200",             // Tamaño fijo (menos recursos)
+                "--disable-background-networking",
+                "--disable-background-timer-throttling",
+                "--disable-breakpad",
+                "--disable-client-side-phishing-detection",
+                "--disable-default-apps",
+                "--disable-features=site-per-process",
+                "--disable-hang-monitor",
+                "--disable-popup-blocking",
+                "--disable-prompt-on-repost",
+                "--disable-renderer-backgrounding",
+                "--disable-sync",
+                "--metrics-recording-only",
+                "--no-default-browser-check",
+                "--safebrowsing-disable-auto-update",
+                "--password-store=basic",
+                "--use-mock-keychain",
+                "--disable-notifications",
+                "--disable-extensions",
+                "--hide-scrollbars",
+                //"--blink-settings=imagesEnabled=false", // ⚠️ Desactiva imágenes (hace fallar)
+                //"--enable-automation",...............// (hace fallar)
                 //"--single-process",                  // No forks (hace Fallar)
                 "--js-flags=--no-expose-wasm,--jitless", // Desactiva JIT y WebAssembly
             ],
@@ -82,10 +103,10 @@ export async function scrapeClearance(req: Request, res: Response) {
         page.setDefaultTimeout(data.timeout ?? 60_000);
 
         await page.setUserAgent("Mozilla/5.0 (Linux; Android 10; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Mobile Safari/537.36");
-        await page.setViewport({ width: 500, height: 300});
+        await page.setViewport({ width: 330, height: 250});
 
         if (data.method === "GET") {
-            await page.goto(data.url, { waitUntil: "networkidle2" });
+            await page.goto(data.url, { waitUntil: "domcontentloaded" });
         } else if (data.method === "POST") {
             await sendPostRequest(page, data);
         }
@@ -101,59 +122,7 @@ export async function scrapeClearance(req: Request, res: Response) {
 
         browserLogger.info("Successfully obtained clearance");
 
-        // Aquí haces el request con Python
-        const pythonScriptPath = path.resolve(__dirname, "../scripts/scraper.py");
-        const html = await new Promise<string>((resolve, reject) => {
-            const python = spawn("python3", [pythonScriptPath]);
-
-            const inputPayload = JSON.stringify({
-                url: data.url,
-                headers: session.headers,
-                cookies: session.cookies,
-            });
-
-            let output = "";
-            let errorOutput = "";
-
-            python.stdin.write(inputPayload);
-            python.stdin.end();
-
-            python.stdout.on("data", (data) => {
-                output += data.toString();
-            });
-
-            python.stderr.on("data", (data) => {
-                errorOutput += data.toString();
-            });
-
-            python.on("close", (code) => {
-                if (code !== 0) {
-                    browserLogger.error({
-                        msg: "Python scraper failed",
-                        code,
-                        error: errorOutput,
-                    });
-                    return reject(new Error(errorOutput || "Python scraper failed"));
-                }
-
-                try {
-                    const result = JSON.parse(output);
-                    resolve(result.html || "");
-                } catch (err) {
-                    browserLogger.error({
-                        msg: "Invalid JSON from Python",
-                        rawOutput: output,
-                    });
-                    reject(new Error("Invalid JSON output from scraper"));
-                }
-            });
-        });
-
-        return res.json({
-            status: "success",
-            html,
-        });
-
+        return handleSuccessResponse(session, res);
     } catch (error) {
         const errorData: Record<string, unknown> = {};
 
@@ -182,44 +151,62 @@ export async function scrapeClearance(req: Request, res: Response) {
 }
 
 async function getClearance(
-    page: PageWithCursor,
-    browser: Browser,
-    data: ScrapeClearanceData,
-    logger: pino.Logger
-) {
-    logger.info("Waiting for Cloudflare challenge to complete");
+  page: PageWithCursor,
+  browser: Browser,
+  data: ScrapeClearanceData,
+  logger: pino.Logger
+): Promise<{ html: string }> {
+  logger.info("Waiting for Cloudflare challenge to complete");
 
-    let isResolved = false;
+  let isResolved = false;
+  //await page.setViewport({ width: 320, height: 200 });
 
-    return new Promise(async (resolve, reject) => {
-        await page.setRequestInterception(true);
-        page.on("request", async (request) => request.continue());
-        page.on("response", async (res) => {
-            try {
-                if (
-                    [200, 302].includes(res.status()) &&
-                    [data.url, data.url + "/"].includes(res.url())
-                ) {
-                    await page
-                        .waitForNavigation({ waitUntil: "load", timeout: 10000 })
-                        .catch(() => {});
-                    const cookies = await browser.cookies();
-                    let headers = res.request().headers();
-                    delete headers["content-type"];
-                    delete headers["accept-encoding"];
-                    delete headers["accept"];
-                    delete headers["content-length"];
-                    isResolved = true;
-                    clearInterval(cl);
-                    resolve({ cookies, headers });
-                }
-            } catch (e) {}
-        });
+  return new Promise(async (resolve, reject) => {
+    await page.setRequestInterception(true);
 
-        const cl = setTimeout(async () => {
-            if (!isResolved) {
-                reject("Timeout Error");
-            }
-        }, data.timeout || 60000);
+    page.on('request', req => {
+        if (['stylesheet', 'font'].includes(req.resourceType())) req.abort();
+        else req.continue();
     });
+
+    page.on("response", async (res) => {
+      try {
+        const url = res.url();
+        const status = res.status();
+
+        //logger.info(`Response: ${url} ${status}`);
+
+        if (
+          [200, 302, 403].includes(status) &&
+          [data.url, data.url + "/"].includes(url)
+        ) {
+          try {
+            await page.waitForNavigation({
+              waitUntil: "domcontentloaded",
+              timeout: 30000,
+            });
+          } catch (_) {
+            // ignorar timeout
+          }
+
+          const html = await page.content();
+
+          isResolved = true;
+          clearInterval(cl);
+          page.removeAllListeners('request');
+          await page.setRequestInterception(false); // (optional, to disable interception)
+          await page.close();
+          return resolve({ html });
+        }
+      } catch (err) {
+        logger.warn({ msg: "Error processing response", err });
+      }
+    });
+
+    const cl = setTimeout(() => {
+      if (!isResolved) {
+        reject("Timeout Error");
+      }
+    }, data.timeout || 60000);
+  });
 }

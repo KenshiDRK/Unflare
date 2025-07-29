@@ -65,7 +65,6 @@
         ],
         "splitting": false,
         "sourcemap": true,
-        "clean": true,
-        "exclude": ["**/*.py"]
+        "clean": true
     }
 }

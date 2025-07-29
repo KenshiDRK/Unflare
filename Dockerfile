@@ -5,9 +5,6 @@ RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
     ca-certificates \
-    python3 \
-    python3-pip \
-    python3-requests \
     fonts-liberation \
     libasound2 \
     libatk-bridge2.0-0 \
@@ -46,7 +43,6 @@ RUN npm install -g pnpm
 WORKDIR /usr/src/app
 
 # Copy package files and install dependencies using pnpm
-COPY scripts/ ./scripts/
 COPY package*.json ./
 COPY . .
 
