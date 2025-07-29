@@ -60,7 +60,7 @@ export async function scrapeClearance(req: Request, res: Response) {
                 "--disable-dev-tools",               // DevTools innecesarios
                 "--no-first-run",                    // Evita configuraciones iniciales
                 "--mute-audio",                      // Silencia todo, menos carga
-                "--window-size=640,480",             // Tamaño fijo (menos recursos)
+                "--window-size=500,300",             // Tamaño fijo (menos recursos)
                 //"--single-process",                  // No forks (hace Fallar)
                 "--js-flags=--no-expose-wasm,--jitless", // Desactiva JIT y WebAssembly
             ],
@@ -81,7 +81,8 @@ export async function scrapeClearance(req: Request, res: Response) {
 
         page.setDefaultTimeout(data.timeout ?? 60_000);
 
-        await page.setViewport({ width: 640, height: 480});
+        await page.setUserAgent("Mozilla/5.0 (Linux; Android 10; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Mobile Safari/537.36");
+        await page.setViewport({ width: 500, height: 300});
 
         if (data.method === "GET") {
             await page.goto(data.url, { waitUntil: "networkidle2" });
