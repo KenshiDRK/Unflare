@@ -177,7 +177,7 @@ async function getClearance(
         //logger.info(`Response: ${url} ${status}`);
 
         if (
-          [200, 302, 403].includes(status) &&
+          [200, 302].includes(status) &&
           [data.url, data.url + "/"].includes(url)
         ) {
           try {
