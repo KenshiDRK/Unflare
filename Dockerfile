@@ -1,26 +1,57 @@
-FROM node:latest
+FROM node:24.4.1-slim
 
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
     ca-certificates \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libatspi2.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxkbcommon0 \
+    libxrandr2 \
+    xdg-utils \
     apt-transport-https \
-    chromium \
-    chromium-driver \
     xvfb \
     && rm -rf /var/lib/apt/lists/*
 
-ENV CHROME_BIN=/usr/bin/chromium
+# Download and install Chrome
+RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list \
+    && apt-get update \
+    && apt-get install -y google-chrome-stable \
+    && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Set Chrome path
+ENV CHROME_BIN=/usr/bin/google-chrome
 
+# Install pnpm globally
+RUN npm install -g pnpm
+
+WORKDIR /usr/src/app
+
+# Copy package files and install dependencies using pnpm
 COPY package*.json ./
-
-RUN npm update
-RUN npm install
-RUN npm i -g pm2
 COPY . .
 
-EXPOSE 3000
+RUN pnpm install --frozen-lockfile
 
-CMD ["pm2-runtime", "src/index.js"]
+# Copy remaining application code and build
+RUN pnpm run build
+
+EXPOSE 8080
+ENV NODE_ENV=production
+
+CMD ["pnpm", "run", "start"]
